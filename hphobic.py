@@ -10,6 +10,7 @@ from subprocess import call
 import subprocess
 import math
 import getopt
+import urllib2
 
 AminoAcid = ["ala", "arg", "leu", "lys", "met", "gln" , "ile", "trp", "phe", "tyr", "cys" , "val", "asn" , "ser" , "his" , "glu", "thr" , "asp" , "gly" , "pro"]
 Aminoacid = [ "a",   "r",   "l",   "k",   "m",   "q" ,   "i",   "w",   "f",   "y",   "c" ,   "v",   "n" ,   "s" ,   "h" ,   "e",   "t" ,   "d" ,   "g" ,   "p"]
@@ -19,6 +20,7 @@ HphoIndex = [  41 ,  -14 ,  97  , -23  ,  74  ,  -10  ,  99  ,  97  ,  100 ,   6
 chain = ''
 pdb = ''
 rcsb = ''
+uniprot = ''
 output = ''
 
 HPchain = []
@@ -26,17 +28,17 @@ HPratio = []
 HPindex = []
 
 def main(argv):
-	global chain, pdb, rcsb, output
+	global chain, pdb, rcsb, uniprot, output
 
 	try:
-		opts, args = getopt.getopt(argv,"hc:p:r:o:",["chain=","pdb file=","rcsb=","output="])
+		opts, args = getopt.getopt(argv,"hc:p:r:u:o:",["chain=","pdb file=","rcsb=","uniprot","output="])
 	except getopt.GetoptError:
-		print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -o <Output>'
+		print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -u <Uniprot> -o <Output>'
 		sys.exit(2)
 
 	for opt, arg in opts:
 		if opt == '-h':
-		  print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -o <Output>'
+		  print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -u <Uniprot> -o <Output>'
 		  sys.exit()
 		elif opt in ("-c", "--chain"):
 		  chain = arg
@@ -44,6 +46,8 @@ def main(argv):
 		  pdb = arg
 		elif opt in ("-r", "--rcsb"):
 		  rcsb = arg
+		elif opt in ("-u", "--uniprot"):
+		  uniprot = arg
 		elif opt in ("-o", "--output"):
 		  output = arg
 
@@ -54,7 +58,7 @@ def isHyrophobic(aa):
 		return True
 	elif(aa == 'ile' or aa == 'i'):
 		return True
-	elif(aa == 'tpr' or aa == 'w'):
+	elif(aa == 'trp' or aa == 'w'):
 		return True
 	elif(aa == 'leu' or aa == 'l'):
 		return True
@@ -71,24 +75,36 @@ def isHyrophobic(aa):
 	else: return False
 
 def chainMethod():
+	calcBySequence(chain)
+
+def uriprotMethod():
+	result = urllib2.urlopen("http://www.uniprot.org/uniprot/"+uniprot+".fasta").read()
+	seq = ''
+	for x in range(1, len(result.split('\n'))):
+		seq += result.split('\n')[x]
+	calcBySequence(seq)
+
+def calcBySequence(seq):
 	global HPratio, HPindex
 	HPchain.append('main')
 	HPratio.append(0.0)
 	HPindex.append(0.0)
 
-	for c in chain:
+	for c in seq:
 		if isHyrophobic(c) == True:
 			HPratio[0] += 1
 		HPindex[0] += HphoIndex[Aminoacid.index(c.lower())]
 
 	# HPratio
-	HPratio[0] /= len(chain)
+	HPratio[0] /= len(seq)
 	HPratio[0] *= 100
-	print 'Hydrophobic ratio: '+str(HPratio[0])+'%'
+	print 'Hydrophobic ratio: '+ "{0:.2f}".format(HPratio[0])+' %'
 
 	# HPindex
-	HPindex[0] /= len(chain)
-	print 'Hydrophobic index: '+str(HPindex[0])
+	HPindex[0] /= len(seq)
+	print 'Hydrophobic index: '+ "{0:.2f}".format(HPindex[0])
+
+
 
 def pdbMethod():
 	# parse from pdb
@@ -151,6 +167,8 @@ def calcByPrody(protein):
 		print '\n'
 
 
+	
+
 def outputStep():
 	f = open(output,'w')
 	for x in range(0, len(HPchain)):
@@ -168,6 +186,9 @@ if __name__ == "__main__":
 
 	if(pdb != ''):
 		pdbMethod()
+
+	if(uniprot != ''):
+		uriprotMethod()
 
 	if(rcsb != ''):
 		rcsbMethod()
