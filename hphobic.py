@@ -4,7 +4,6 @@ from os import listdir
 import glob
 import os
 import sys
-import Avogadro
 import os.path
 from subprocess import check_output
 from subprocess import call
