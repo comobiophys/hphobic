@@ -14,13 +14,14 @@ import urllib2
 
 AminoAcid = ["ala", "arg", "leu", "lys", "met", "gln" , "ile", "trp", "phe", "tyr", "cys" , "val", "asn" , "ser" , "his" , "glu", "thr" , "asp" , "gly" , "pro"]
 Aminoacid = [ "a",   "r",   "l",   "k",   "m",   "q" ,   "i",   "w",   "f",   "y",   "c" ,   "v",   "n" ,   "s" ,   "h" ,   "e",   "t" ,   "d" ,   "g" ,   "p"]
-HphoIndex = [  41 ,  -14 ,  97  , -23  ,  74  ,  -10  ,  99  ,  97  ,  100 ,   63 ,   49  ,  76  ,  -28  ,   -5  , 	  8  ,  -31 ,   13  ,  -55  ,    0  ,  -46 ] 
+HphoIndex = [  1.8 , -4.5,  3.8 , -3.9 ,  1.9 ,  -3.5 ,  4.5  , -0.9 , 2.8 , -1.3 ,  2.5  ,  4.2  , -3.5 , -0.8  , -3.2  ,  -3.5 , -0.7  , -3.5 , -0.4  , -1.6 ] 
 
 # Global variable
 chain = ''
 pdb = ''
 rcsb = ''
 uniprot = ''
+files = ''
 output = ''
 
 HPchain = []
@@ -28,17 +29,17 @@ HPratio = []
 HPindex = []
 
 def main(argv):
-	global chain, pdb, rcsb, uniprot, output
+	global chain, pdb, rcsb, uniprot, files, output
 
 	try:
-		opts, args = getopt.getopt(argv,"hc:p:r:u:o:",["chain=","pdb file=","rcsb=","uniprot","output="])
+		opts, args = getopt.getopt(argv,"hc:p:r:u:f:o:",["chain=","pdb file=","rcsb=","uniprot=","file=","output="])
 	except getopt.GetoptError:
-		print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -u <Uniprot> -o <Output>'
+		print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -u <Uniprot> -f <File> -o <Output>'
 		sys.exit(2)
 
 	for opt, arg in opts:
 		if opt == '-h':
-		  print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -u <Uniprot> -o <Output>'
+		  print 'hphobic.py -c <Chain Sequence> -p <PDB File> -r <RCSB Id> -u <Uniprot> -f <File> -o <Output>'
 		  sys.exit()
 		elif opt in ("-c", "--chain"):
 		  chain = arg
@@ -48,8 +49,11 @@ def main(argv):
 		  rcsb = arg
 		elif opt in ("-u", "--uniprot"):
 		  uniprot = arg
+		elif opt in ("-f", "--file"):
+		  files = arg
 		elif opt in ("-o", "--output"):
 		  output = arg
+		
 
 def isHyrophobic(aa):
 	aa = aa.lower()
@@ -66,7 +70,7 @@ def isHyrophobic(aa):
 		return True
 	elif(aa == 'met' or aa == 'm'):
 		return True
-	elif(aa == 'tyr' or aa == 'y'):
+	elif(aa == 'gly' or aa == 'g'):
 		return True
 	elif(aa == 'cys' or aa == 'c'):
 		return True
@@ -75,16 +79,16 @@ def isHyrophobic(aa):
 	else: return False
 
 def chainMethod():
-	calcBySequence(chain)
+	calcBySequence(chain, 0)
 
 def uriprotMethod():
 	result = urllib2.urlopen("http://www.uniprot.org/uniprot/"+uniprot+".fasta").read()
 	seq = ''
 	for x in range(1, len(result.split('\n'))):
 		seq += result.split('\n')[x]
-	calcBySequence(seq)
+	calcBySequence(seq, 0)
 
-def calcBySequence(seq):
+def calcBySequence(seq, index):
 	global HPratio, HPindex
 	HPchain.append('main')
 	HPratio.append(0.0)
@@ -92,17 +96,17 @@ def calcBySequence(seq):
 
 	for c in seq:
 		if isHyrophobic(c) == True:
-			HPratio[0] += 1
-		HPindex[0] += HphoIndex[Aminoacid.index(c.lower())]
+			HPratio[index] += 1
+		HPindex[index] += HphoIndex[Aminoacid.index(c.lower())]
 
 	# HPratio
-	HPratio[0] /= len(seq)
-	HPratio[0] *= 100
-	print 'Hydrophobic ratio: '+ "{0:.2f}".format(HPratio[0])+' %'
+	HPratio[index] /= len(seq)
+	HPratio[index] *= 100
+	print 'Hydrophobic ratio: '+ "{0:.2f}".format(HPratio[index])+' %'
 
 	# HPindex
-	HPindex[0] /= len(seq)
-	print 'Hydrophobic index: '+ "{0:.2f}".format(HPindex[0])
+	HPindex[index] /= len(seq)
+	print 'Hydrophobic index: '+ "{0:.2f}".format(HPindex[index])
 
 
 
@@ -115,6 +119,19 @@ def rcsbMethod():
 	# parse from rcsb server
 	protein = parsePDB(rcsb)
 	calcByPrody(protein)
+
+def fileMethod():
+	f = open(files, "r")
+  	contents = f.readlines()
+	f.close()
+	index = 0
+	for x in range(0, len(contents)):
+		if(isSequence(contents[x].split('\n')[0])):
+			print '\n'
+			print contents[x].split('\n')[0]
+			calcBySequence(contents[x].split('\n')[0], index)
+			index+=1
+			
 
 def calcByPrody(protein):
 	global HPratio, HPindex, HPchain
@@ -166,7 +183,11 @@ def calcByPrody(protein):
 		print 'Hydrophobic index: '+ "{0:.2f}".format(HPindex[x])
 		print '\n'
 
-
+def isSequence(seq):
+	for c in seq:
+		if len([s for s in Aminoacid if c.lower() in s]) == 0:
+			return False
+	return True;
 	
 
 def outputStep():
@@ -192,6 +213,9 @@ if __name__ == "__main__":
 
 	if(rcsb != ''):
 		rcsbMethod()
+	
+	if(files != ''):
+		fileMethod()	
 
 	if(output != ''):
 		outputStep()
